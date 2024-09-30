@@ -55,6 +55,8 @@ class Q1:
     
         return cov
 
+def manhattan_distance(p, X):
+    return np.sum(np.abs(X - p), axis=1)  
 
 class HardParzen:
     def __init__(self, h):
@@ -63,10 +65,7 @@ class HardParzen:
     def fit(self, train_inputs, train_labels):
         self.label_list = np.unique(train_labels)
         self.train_inputs = train_inputs
-        self.train_labels = train_labels
-
-    def manhattan_distance(self, p, X):
-        return np.sum(np.abs(X - p), axis=1)   
+        self.train_labels = train_labels 
 
     def predict(self, test_data):
         predictions = []
@@ -103,9 +102,21 @@ class SoftRBFParzen:
     def predict(self, test_data):
         pass
 
-
 def split_dataset(iris):
-    pass
+
+    # Get the indices of the rows
+    indices = np.arange(iris.shape[0])
+
+    # Remainder is 0, 1 or 2
+    train = iris[indices % 5 <= 2]
+
+    # Remainder is 3
+    validation = iris[indices % 5 == 3]
+
+    # Remainder is 4
+    test = iris[indices % 5 == 4]
+
+    return train, validation, test
 
 
 class ErrorRate:
@@ -131,10 +142,19 @@ def random_projections(X, A):
 
 
 if __name__ == "__main__":
+
+    # Test Q1
     Q1 = Q1()
 
     print(Q1.feature_means(iris))
     print(Q1.empirical_covariance(iris))
     print(Q1.feature_means_class_1(iris))
     print(Q1.empirical_covariance_class_1(iris))
-    
+
+    # Test split_dataset
+    train, validation, test = split_dataset(iris)
+
+    # Display the first few rows of each set
+    print("Train set:\n", train[:5])
+    print("Validation set:\n", validation[:5])
+    print("Test set:\n", test[:5])
