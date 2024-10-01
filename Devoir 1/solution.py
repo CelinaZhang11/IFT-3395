@@ -15,24 +15,21 @@ def draw_rand_label(x, label_list):
 
 class Q1:
 
-    def feature_means(self, iris):
-
+    def feature_means(self, iris) :
         data = iris[:, :-1] 
 
         means = np.mean(data, axis=0) 
 
         return means
 
-    def empirical_covariance(self, iris):
-        
+    def empirical_covariance(self, iris) :
         data = iris[:, :-1]
 
         cov = np.cov(data, rowvar=False)
 
         return cov
 
-    def feature_means_class_1(self, iris):
-
+    def feature_means_class_1(self, iris) :
         data_with_labels = iris
         
         # Select the rows with label 1
@@ -43,8 +40,7 @@ class Q1:
 
         return means
 
-    def empirical_covariance_class_1(self, iris):
-            
+    def empirical_covariance_class_1(self, iris) : 
         data_with_labels = iris
     
         # Select the rows with label 1
@@ -55,28 +51,26 @@ class Q1:
     
         return cov
 
-def manhattan_distance(p, X):
+def manhattan_distance(p, X) :
     return np.sum(np.abs(X - p), axis=1)  
 
-class HardParzen:
-    def __init__(self, h):
+class HardParzen :
+    def __init__(self, h) :
         self.h = h
 
-    def fit(self, train_inputs, train_labels):
+    def fit(self, train_inputs, train_labels) :
         self.label_list = np.unique(train_labels)
         self.train_inputs = train_inputs
         self.train_labels = train_labels 
 
-    def predict(self, test_data):
-
+    def predict(self, test_data) :
         # Initialization of the count matrix and the predicted classes array
         num_test = test_data.shape[0]
         counts = np.zeros((num_test, self.label_list))
         classes_pred = np.zeros(num_test)
 
         # For each test datapoint
-        for i, p in enumerate(test_data):
-
+        for i, p in enumerate(test_data) :
             # Calculate distances to each training set point using Manhattan distance
             distances = self.manhattan_distance(p, self.train_inputs)
             M = len(distances)
@@ -84,18 +78,18 @@ class HardParzen:
             # Go through the training set to find neighbors of the current point (p)
             ind_neighbors = []
             radius = self.h
-            while len(ind_neighbors) == 0:
+            while len(ind_neighbors) == 0 :
                 ind_neighbors = np.array([j for j in range(M) if distances[j] < radius])
                 radius *= 2
 
             # If no neighbors are found, draw a random label
-            if len(ind_neighbors) == 0:
+            if len(ind_neighbors) == 0 :
                 label = self.draw_rand_label(p, self.label_list)
                 classes_pred[i] = label
             else:
                 # Get the labels of the neighbors
                 cl_neighbors = list(self.train_labels[ind_neighbors] - 1)
-                for j in range(len(cl_neighbors)):
+                for j in range(len(cl_neighbors)) :
                     counts[i, cl_neighbors[j]] += 1
 
                 # Assign most frequent label
@@ -105,34 +99,41 @@ class HardParzen:
         
 
 class SoftRBFParzen:
-    def __init__(self, sigma):
+    def __init__(self, sigma) :
         self.sigma  = sigma
 
-    def fit(self, train_inputs, train_labels):
+    def fit(self, train_inputs, train_labels) :
         self.label_list = np.unique(train_labels)
         self.train_inputs = train_inputs
         self.train_labels = train_labels
 
-    def predict(self, test_data):
+    def rbf_kernel(self, distance) :
+        return np.exp(-distance**2/(2*self.sigma**2))
 
-        predictions = []
+    def predict(self, test_data) :
+        # Initialization of the count matrix and predicted classes array
+        num_test = test_data.shape[0]
+        counts = np.zeros((num_test, len(self.label_list)))
+        classes_pred = np.zeros(num_test) 
 
-        for p in test_data :
-            # Calculate the distances between the test point and all the training points
+        # For each test datapoint
+        for i, p in enumerate(test_data) :
             distances = manhattan_distance(p, self.train_inputs)
 
-            # Calculate the weights
-            rbf = (1/((2*np.pi)**(distances/2))*self.sigma**distances)*np.exp(-distances**2/(2*self.sigma**2))
+            # Calculate the weights for each training point
+            weights = self.rbf_kernel(distances)
 
-            # Weighted labels
-            weighted_labels = np.zeros(len(self.label_list))
+            # Accumulate the weights for each class label
+            for j, label in enumerate(self.label_list) :
+                class_indices = np.where(self.train_labels == label)[0]
+                counts[i, j] = np.sum(weights[class_indices])
 
-            for i, label in enumerate(self.label_list):
-                
+            # Assign the class with the highest weigth
+            classes_pred[i] = self.label_list[np.argmax(counts[i, :])]
 
+        return classes_pred    
 
 def split_dataset(iris):
-
     # Get the indices of the rows
     indices = np.arange(iris.shape[0])
 
@@ -148,15 +149,14 @@ def split_dataset(iris):
     return train, validation, test
 
 
-class ErrorRate:
-    def __init__(self, x_train, y_train, x_val, y_val):
+class ErrorRate :
+    def __init__(self, x_train, y_train, x_val, y_val) :
         self.x_train = x_train
         self.y_train = y_train
         self.x_val = x_val
         self.y_val = y_val
 
-    def hard_parzen(self, h):
-
+    def hard_parzen(self, h) :
         hp = HardParzen(h)
         hp.fit(self.x_train, self.y_train)
 
@@ -164,10 +164,27 @@ class ErrorRate:
         predictions = hp.predict(self.x_val)
         
         # Calculate error rate
-        return np.mean(predictions != self.y_val)
+        error_rate = 0
+        for i, prediction in enumerate(predictions) :
+            if prediction != self.y_val[i] :
+                error_rate += 1
+        
+        return error_rate / len(predictions)
 
-    def soft_parzen(self, sigma):
-        pass
+    def soft_parzen(self, sigma) :
+        sp = SoftRBFParzen(sigma)
+        sp.fit(self.x_train, self.y_train)
+
+        # Make predictions
+        predictions = sp.predict(self.x_val)
+        
+        # Calculate error rate
+        error_rate = 0
+        for i, prediction in enumerate(predictions) :
+            if prediction != self.y_val[i] :
+                error_rate += 1
+        
+        return error_rate / len(predictions)
 
 
 def get_test_errors(iris):
