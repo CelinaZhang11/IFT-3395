@@ -68,27 +68,43 @@ class HardParzen:
         self.train_labels = train_labels 
 
     def predict(self, test_data):
-        predictions = []
 
-        for p in test_data :
+        # Initialization of the count matrix and the predicted classes array
+        num_test = test_data.shape[0]
+        counts = np.zeros((num_test, self.label_list))
+        classes_pred = np.zeros(num_test)
 
-            # Calculate the distances between the test point and all the training points
+        # For each test datapoint
+        for i, p in enumerate(test_data):
+
+            # Calculate distances to each training set point using Manhattan distance
             distances = self.manhattan_distance(p, self.train_inputs)
+            M = len(distances)
 
-            # Select the neighbors within the radius h
-            neighbors = np.where(distances <= self.h)[0]
+            # Go through the training set to find neighbors of the current point (p)
+            ind_neighbors = []
+            if self.parzen:
+                radius = self.h
+                while len(ind_neighbors) == 0:
+                    ind_neighbors = np.array([j for j in range(M) if distances[j] < radius])
+                    radius *= 2
+            else:
+                ind_neighbors = np.argsort(distances)[:self.k]
 
-            if len(neighbors) == 0 :
-                # If there are no neighbors, draw a random label
-                label = draw_rand_label(p, self.label_list)
-            else :
+            # If no neighbors are found, draw a random label
+            if len(ind_neighbors) == 0:
+                label = self.draw_rand_label(p, self.label_list)
+                classes_pred[i] = label
+            else:
                 # Get the labels of the neighbors
-                neighbor_labels = self.train_labels[neighbors]
-                label = Counter(neighbor_labels).most_common(1)[0][0]
+                cl_neighbors = list(self.train_labels[ind_neighbors] - 1)
+                for j in range(min(len(cl_neighbors), self.k)):
+                    counts[i, cl_neighbors[j]] += 1
 
-            predictions.append(label)    
-        
-        return np.array(predictions)
+                # Define classes_pred[i] based on the counts matrix
+                classes_pred[i] = np.argmax(counts[i, :]) + 1
+
+        return classes_pred
         
 
 class SoftRBFParzen:
@@ -96,11 +112,29 @@ class SoftRBFParzen:
         self.sigma  = sigma
 
     def fit(self, train_inputs, train_labels):
-        # self.label_list = np.unique(train_labels)
-        pass
+        self.label_list = np.unique(train_labels)
+        self.train_inputs = train_inputs
+        self.train_labels = train_labels
 
     def predict(self, test_data):
-        pass
+
+        predictions = []
+
+        for p in test_data :
+            # Calculate the distances between the test point and all the training points
+            distances = manhattan_distance(p, self.train_inputs)
+
+            # Calculate the weights
+            rbf = (1/((2*np.pi)**(distances/2))*self.sigma**distances)*np.exp(-distances**2/(2*self.sigma**2))
+
+            # Weighted labels
+            weighted_labels = np.zeros(len(self.label_list))
+
+            for i, label in enumerate(self.label_list):
+                pass
+
+            pass
+
 
 def split_dataset(iris):
 
@@ -127,7 +161,15 @@ class ErrorRate:
         self.y_val = y_val
 
     def hard_parzen(self, h):
-        pass
+
+        hp = HardParzen(h)
+        hp.fit(self.x_train, self.y_train)
+
+        # Make predictions
+        predictions = hp.predict(self.x_val)
+        
+        # Calculate error rate
+        return np.mean(predictions != self.y_val)
 
     def soft_parzen(self, sigma):
         pass
