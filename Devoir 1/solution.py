@@ -83,13 +83,10 @@ class HardParzen:
 
             # Go through the training set to find neighbors of the current point (p)
             ind_neighbors = []
-            if self.parzen:
-                radius = self.h
-                while len(ind_neighbors) == 0:
-                    ind_neighbors = np.array([j for j in range(M) if distances[j] < radius])
-                    radius *= 2
-            else:
-                ind_neighbors = np.argsort(distances)[:self.k]
+            radius = self.h
+            while len(ind_neighbors) == 0:
+                ind_neighbors = np.array([j for j in range(M) if distances[j] < radius])
+                radius *= 2
 
             # If no neighbors are found, draw a random label
             if len(ind_neighbors) == 0:
@@ -98,10 +95,10 @@ class HardParzen:
             else:
                 # Get the labels of the neighbors
                 cl_neighbors = list(self.train_labels[ind_neighbors] - 1)
-                for j in range(min(len(cl_neighbors), self.k)):
+                for j in range(len(cl_neighbors)):
                     counts[i, cl_neighbors[j]] += 1
 
-                # Define classes_pred[i] based on the counts matrix
+                # Assign most frequent label
                 classes_pred[i] = np.argmax(counts[i, :]) + 1
 
         return classes_pred
@@ -131,9 +128,7 @@ class SoftRBFParzen:
             weighted_labels = np.zeros(len(self.label_list))
 
             for i, label in enumerate(self.label_list):
-                pass
-
-            pass
+                
 
 
 def split_dataset(iris):
