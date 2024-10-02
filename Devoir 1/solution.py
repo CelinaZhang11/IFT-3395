@@ -1,5 +1,8 @@
 import numpy as np
 from collections import Counter
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.datasets import load_iris
 iris = np.genfromtxt("iris.txt")
 
 ######## DO NOT MODIFY THIS FUNCTION ########
@@ -218,3 +221,69 @@ def random_projections(X, A):
     X_proj = (1 / np.sqrt(2)) * np.dot(X, A)
     
     return X_proj
+
+
+if __name__ == "__main__":
+
+    ### Test Q1 ###
+    Q1 = Q1()
+
+    print(Q1.feature_means(iris))
+    print(Q1.empirical_covariance(iris))
+    print(Q1.feature_means_class_1(iris))
+    print(Q1.empirical_covariance_class_1(iris))
+
+    ### Test HardParzen ###
+    hp = HardParzen(0.1)
+    hp.fit(iris[:, :-1], iris[:, -1])
+    print(hp.predict(iris[:, :-1]))
+
+    ### Test SoftRBFParzen ###
+    sp = SoftRBFParzen(0.1)
+    sp.fit(iris[:, :-1], iris[:, -1])
+    print(sp.predict(iris[:, :-1]))
+
+    ### Test split_dataset ###
+    train, validation, test = split_dataset(iris)
+
+    # Display the first few rows of each set
+    print("Train set:\n", train[:5])
+    print("Validation set:\n", validation[:5])
+    print("Test set:\n", test[:5])
+
+    # Graph
+
+    # Split the dataset
+    train, validation, test = split_dataset(iris)
+    error_rate = ErrorRate(train[:, :4], train[:, -1], validation[:, :4], validation[:, -1])
+
+    h_values = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 3.0, 10.0, 20.0]
+
+    hp_errors = []
+    for h in h_values :
+        hp_errors.append(error_rate.hard_parzen(h))
+
+    print(hp_errors)    
+
+    sigma_values = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 3.0, 10.0, 20.0]
+
+    sp_errors = []
+    for s in sigma_values :
+        sp_errors.append(error_rate.soft_parzen(s))
+
+    print(sp_errors)
+
+    # Plot the classification errors
+    plt.figure(figsize=(10, 6))
+    plt.plot(h_values, hp_errors, label="Hard Parzen", marker='o')
+    plt.plot(sigma_values, sp_errors, label="Soft Parzen (RBF)", marker='o')
+    plt.xlabel('h (Hard Parzen) / σ (Soft Parzen)')
+    plt.ylabel('Classification Error')
+    plt.title('Comparison of Classification Errors')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+    ### Test get_test_errors ###
+    test_errors = get_test_errors(iris)
+    print(test_errors)
