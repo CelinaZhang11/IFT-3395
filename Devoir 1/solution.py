@@ -64,7 +64,7 @@ class HardParzen :
     def fit(self, train_inputs, train_labels) :
         self.label_list = np.unique(train_labels)
         self.train_inputs = train_inputs
-        self.train_labels = train_labels 
+        self.train_labels = train_labels
 
     def predict(self, test_data) :
         # Initialization of the count matrix and the predicted classes array
@@ -81,26 +81,21 @@ class HardParzen :
             # Go through the training set to find neighbors of the current point (p)
             ind_neighbors = []
             radius = self.h
-            while len(ind_neighbors) == 0 :
-                ind_neighbors = np.array([j for j in range(M) if distances[j] < radius])
-                radius *= 2
-
+            ind_neighbors = np.array([j for j in range(M) if distances[j] < radius])
             # If no neighbors are found, draw a random label
             if len(ind_neighbors) == 0 :
-                label = self.draw_rand_label(p, self.label_list)
+                label = draw_rand_label(p, self.label_list)
                 classes_pred[i] = label
             else:
                 # Get the labels of the neighbors
-                cl_neighbors = list(self.train_labels[ind_neighbors] - 1)
-                for j in range(len(cl_neighbors)) :
-                    index = int(cl_neighbors[j])
+                for j in ind_neighbors:
+                    index = int(self.train_labels[j]) - 1
                     counts[i, index] += 1
 
                 # Assign most frequent label
                 classes_pred[i] = np.argmax(counts[i, :]) + 1
 
         return classes_pred
-        
 
 class SoftRBFParzen:
     def __init__(self, sigma) :
@@ -169,8 +164,8 @@ class ErrorRate :
         
         # Calculate error rate
         error_rate = 0
-        for i, prediction in enumerate(predictions) :
-            if prediction != self.y_val[i] :
+        for i in range(len(predictions)) :
+            if predictions[i] != self.y_val[i] :
                 error_rate += 1
         
         return error_rate / len(predictions)
@@ -184,15 +179,59 @@ class ErrorRate :
         
         # Calculate error rate
         error_rate = 0
-        for i, prediction in enumerate(predictions) :
-            if prediction != self.y_val[i] :
+        for i in range(len(predictions)) :
+            if predictions[i] != self.y_val[i] :
                 error_rate += 1
         
         return error_rate / len(predictions)
 
 
 def get_test_errors(iris):
-    pass
+    X_train, y_train, X_val, y_val, X_test, y_test = split_dataset(iris)
+
+    # Values for h (Hard Parzen) and sigma (Soft Parzen)
+    h_values = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 3.0, 10.0, 20.0]
+    sigma_values = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 3.0, 10.0, 20.0]
+
+    # Initialize arrays to store errors
+    hp_errors = []
+    sp_errors = []
+
+    # Evaluate Hard Parzen
+    for h in h_values:
+        hp = HardParzen(h)
+        hp.fit(X_train, y_train)
+        y_pred = hp.predict(X_val)
+        error = np.mean(y_pred != y_val)
+        hp_errors.append(error)
+
+    # Select h* that minimizes the error on the validation set
+    h_star = h_values[np.argmin(hp_errors)] 
+
+    # Evaluate Soft Parzen (with RBF kernel)
+    for sigma in sigma_values:
+        sp = SoftRBFParzen(sigma)
+        sp.fit(X_train, y_train)
+        y_pred = sp.predict(X_val)
+        error = np.mean(y_pred != y_val)
+        sp_errors.append(error)
+
+    # Select sigma* that minimizes the error on the validation set
+    sigma_star = sigma_values[np.argmin(sp_errors)]
+
+    # Calculate the error rate on the test set for Hard Parzen with h*
+    hard_parzen_optimal = HardParzen(h=h_star)
+    hard_parzen_optimal.fit(X_train, y_train)
+    test_predictions_hard = hard_parzen_optimal.predict(X_test)
+    test_error_hard = np.mean(test_predictions_hard != y_test)
+
+    # Calculate the error rate on the test set for Soft Parzen with sigma*
+    soft_parzen_optimal = SoftParzen(sigma=sigma_star)
+    soft_parzen_optimal.fit(X_train, y_train)
+    test_predictions_soft = soft_parzen_optimal.predict(X_test)
+    test_error_soft = np.mean(test_predictions_soft != y_test)
+
+    return np.array([test_error_hard, test_error_soft])   
 
 
 def random_projections(X, A):
@@ -201,7 +240,7 @@ def random_projections(X, A):
 
 if __name__ == "__main__":
 
-    # Test Q1
+    ### Test Q1 ###
     Q1 = Q1()
 
     print(Q1.feature_means(iris))
@@ -209,22 +248,17 @@ if __name__ == "__main__":
     print(Q1.feature_means_class_1(iris))
     print(Q1.empirical_covariance_class_1(iris))
 
-    # Test HardParzen
+    ### Test HardParzen ###
     hp = HardParzen(0.1)
     hp.fit(iris[:, :-1], iris[:, -1])
     print(hp.predict(iris[:, :-1]))
 
-    # Test SoftRBFParzen
+    ### Test SoftRBFParzen ###
     sp = SoftRBFParzen(0.1)
     sp.fit(iris[:, :-1], iris[:, -1])
     print(sp.predict(iris[:, :-1]))
 
-    # Test ErrorRate
-    error_rate = ErrorRate(iris[:, :-1], iris[:, -1], iris[:, :-1], iris[:, -1])
-    print(error_rate.hard_parzen(0.1))
-    print(error_rate.soft_parzen(0.1))
-
-    # Test split_dataset
+    ### Test split_dataset ###
     train, validation, test = split_dataset(iris)
 
     # Display the first few rows of each set
@@ -232,45 +266,39 @@ if __name__ == "__main__":
     print("Validation set:\n", validation[:5])
     print("Test set:\n", test[:5])
 
-    # Load the Iris dataset
-    iris = load_iris()
-    X = iris.data
-    y = iris.target
+    # Graph
 
-    # Split the data into training and validation sets
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Split the dataset
+    train, validation, test = split_dataset(iris)
+    error_rate = ErrorRate(train[:, :4], train[:, -1], validation[:, :4], validation[:, -1])
 
-    # Values for h (Hard Parzen) and sigma (Soft Parzen)
     h_values = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 3.0, 10.0, 20.0]
+
+    hp_errors = []
+    for h in h_values :
+        hp_errors.append(error_rate.hard_parzen(h))
+
+    print(hp_errors)    
+
     sigma_values = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 3.0, 10.0, 20.0]
 
-    # Arrays to store errors
-    hard_parzen_errors = []
-    soft_parzen_errors = []
+    sp_errors = []
+    for s in sigma_values :
+        sp_errors.append(error_rate.soft_parzen(s))
 
-    # Evaluate Hard Parzen
-    for h in h_values:
-        hard_parzen = HardParzen(h)
-        hard_parzen.fit(X_train, y_train)
-        y_pred = hard_parzen.predict(X_val)
-        error = np.mean(y_pred != y_val)
-        hard_parzen_errors.append(error)
-
-    # Evaluate Soft Parzen (with RBF kernel)
-    for sigma in sigma_values:
-        soft_parzen = SoftRBFParzen(sigma)
-        soft_parzen.fit(X_train, y_train)
-        y_pred = soft_parzen.predict(X_val)
-        error = np.mean(y_pred != y_val)
-        soft_parzen_errors.append(error)
+    print(sp_errors)
 
     # Plot the classification errors
     plt.figure(figsize=(10, 6))
-    plt.plot(h_values, hard_parzen_errors, label="Hard Parzen", marker='o')
-    plt.plot(sigma_values, soft_parzen_errors, label="Soft Parzen (RBF)", marker='o')
+    plt.plot(h_values, hp_errors, label="Hard Parzen", marker='o')
+    plt.plot(sigma_values, sp_errors, label="Soft Parzen (RBF)", marker='o')
     plt.xlabel('h (Hard Parzen) / σ (Soft Parzen)')
     plt.ylabel('Classification Error')
     plt.title('Comparison of Classification Errors')
     plt.legend()
     plt.grid(True)
     plt.show()
+
+    ### Test get_test_errors ###
+    test_errors = get_test_errors(iris)
+    print(test_errors)
